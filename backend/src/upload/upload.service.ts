@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { Client } from 'minio';
 import { MINIO_CLIENT } from '../minio/minio.constants.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { UploadResponseDto } from '../dto/Upload/uploadResponse.dto.js';
 
 @Injectable()
 export class UploadService {
@@ -13,17 +14,13 @@ export class UploadService {
         private readonly prisma: PrismaService,
     ) {}
 
-    async upload(file: Express.Multer.File, userId: string){
-        if (!file) {
-            throw new BadRequestException('Arquivo nao enviado.');
+    async upload(files: Express.Multer.File[], userId: string){
+        if (!files?.length) {
+            throw new BadRequestException('Nenhum arquivo foi enviado.');
         }
 
         if (!userId) {
             throw new BadRequestException('Usuario nao identificado.');
-        }
-
-        if (file.mimetype !== 'application/pdf') {
-            throw new BadRequestException('O arquivo precisa ser um PDF valido.');
         }
 
         const parsedUserId = Number(userId);
@@ -33,33 +30,65 @@ export class UploadService {
         }
 
         const bucketName = this.configService.getOrThrow('MINIO_BUCKET');
-        const objectName = this.buildObjectName(userId);
-
         await this.ensureBucketExists(bucketName);
-        await this.minioClient.putObject(bucketName, objectName, file.buffer, file.size, {
-            'Content-Type': file.mimetype,
-        });
+        const uploadedObjects: string[] = [];
+        const createdFileIds: number[] = [];
 
         try {
-            await this.prisma.files.create({
-                data: {
-                    name: file.originalname,
-                    path: objectName,
-                    userId: parsedUserId,
-                },
-            });
+            const results: UploadResponseDto[] = [];
+
+            for (const file of files) {
+                if (file.mimetype !== 'application/pdf') {
+                    throw new BadRequestException(
+                        `O arquivo ${file.originalname} precisa ser um PDF valido.`,
+                    );
+                }
+
+                const objectName = this.buildObjectName(userId);
+
+                await this.minioClient.putObject(bucketName, objectName, file.buffer, file.size, {
+                    'Content-Type': file.mimetype,
+                });
+                uploadedObjects.push(objectName);
+
+                const createdFile = await this.prisma.files.create({
+                    data: {
+                        name: file.originalname,
+                        path: objectName,
+                        userId: parsedUserId,
+                    },
+                });
+                createdFileIds.push(createdFile.id);
+
+                results.push({
+                    bucket: bucketName,
+                    objectName,
+                    originalName: file.originalname,
+                    size: file.size,
+                    mimetype: file.mimetype,
+                });
+            }
+
+            return results;
         } catch (error) {
-            await this.minioClient.removeObject(bucketName, objectName);
+            if (createdFileIds.length) {
+                await this.prisma.files.deleteMany({
+                    where: {
+                        id: {
+                            in: createdFileIds,
+                        },
+                    },
+                });
+            }
+
+            await Promise.all(
+                uploadedObjects.map((objectName) =>
+                    this.minioClient.removeObject(bucketName, objectName).catch(() => undefined),
+                ),
+            );
+
             throw error;
         }
-
-        return {
-            bucket: bucketName,
-            objectName,
-            originalName: file.originalname,
-            size: file.size,
-            mimetype: file.mimetype,
-        };
     }
 
     async update(){

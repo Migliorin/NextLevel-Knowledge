@@ -2,11 +2,11 @@ import {
     BadRequestException,
     Controller,
     Post,
-    UploadedFile,
+    UploadedFiles,
     UseGuards,
     UseInterceptors
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import {
     ApiBearerAuth,
     ApiBody as SwaggerApiBody,
@@ -34,25 +34,29 @@ export class UploadController {
 
     @Post("/upload")
     @UseGuards(JwtAuthGuards)
-    @ApiOperation({ summary: 'Enviar um arquivo PDF para o MinIO' })
+    @ApiOperation({ summary: 'Enviar arquivos PDF para o MinIO' })
     @ApiConsumes('multipart/form-data')
     @SwaggerApiBody({
-        description: 'Arquivo PDF enviado no campo file',
+        description: 'Arquivos PDF enviados no campo files',
         schema: {
             type: 'object',
-            required: ['file'],
+            required: ['files'],
             properties: {
-                file: {
-                    type: 'string',
-                    format: 'binary',
-                    description: 'Arquivo PDF com tamanho maximo de 10 MB',
+                files: {
+                    type: 'array',
+                    items: {
+                        type: 'string',
+                        format: 'binary',
+                    },
+                    description: 'Lista de arquivos PDF com tamanho maximo de 10 MB por arquivo',
                 },
             },
         },
     })
     @ApiCreatedResponse({
-        description: 'Arquivo enviado com sucesso para o MinIO',
+        description: 'Arquivos enviados com sucesso para o MinIO',
         type: UploadResponseDto,
+        isArray: true,
     })
     @ApiBadRequestResponse({
         description: 'Arquivo ausente, invalido ou diferente de PDF',
@@ -61,7 +65,7 @@ export class UploadController {
         description: 'Token JWT ausente ou invalido',
     })
     @UseInterceptors(
-        FileInterceptor('file', {
+        FilesInterceptor('files', 10, {
         storage: memoryStorage(),
         limits: { fileSize: 10 * 1024 * 1024 },
         fileFilter: (_request, file, callback) => {
@@ -76,8 +80,12 @@ export class UploadController {
         },
         }),
     )
-    upload(@UploadedFile() file:  Express.Multer.File, @CurrentUser() user: CurrentUserDto){
-        return this.uploadService.upload(file, user.userId);
+    upload(
+        @UploadedFiles()
+        uploadedFiles: Express.Multer.File[],
+        @CurrentUser() user: CurrentUserDto,
+    ){
+        return this.uploadService.upload(uploadedFiles, user.userId);
     }
 
 }
