@@ -10,6 +10,7 @@ import { AuthService } from './auth.service.js';
 import { SignInDto } from '../dto/Auth/signIn.dto.js';
 import { AccessToken } from '../dto/Auth/accessToken.dto.js';
 import { SignUpDto } from '../dto/Auth/signUp.dto.js';
+import { RefreshTokenDto } from '../dto/Auth/refreshToken.dto.js';
 
 @ApiTags('Auth')
 @Controller('')
@@ -45,5 +46,19 @@ export class AuthController {
   })
   register(@Body() body: SignUpDto): Promise<AccessToken> {
     return this.authService.register(body);
+  }
+
+  @Post('refresh')
+  @ApiOperation({ summary: 'Solicitar novo Access Token' })
+  @ApiBody({
+    type: RefreshTokenDto,
+    description: 'Refresh token',
+  })
+  @ApiCreatedResponse({
+    description: 'Novo Access e Refresh Token',
+    type: AccessToken,
+  })
+  refresh(@Body() body: RefreshTokenDto): Promise<AccessToken>{
+    return this.authService.refresh(body);
   }
 }

@@ -5,14 +5,20 @@ import { promisify } from "util";
 import { JwtService } from '@nestjs/jwt';
 import { SignInDto } from '../dto/Auth/signIn.dto.js';
 import { SignUpDto } from '../dto/Auth/signUp.dto.js';
-import { AccessToken } from 'src/dto/Auth/accessToken.dto.js';
-import { CurrentUserDto } from 'src/dto/Auth/currentUser.dto.js';
+import { AccessToken } from '../dto/Auth/accessToken.dto.js';
+import { CurrentUserDto } from '../dto/Auth/currentUser.dto.js';
+import { ConfigService } from '@nestjs/config';
+import { RefreshTokenDto } from '../dto/Auth/refreshToken.dto.js';
 
 const scrypt = promisify(_scrypt);
 
 @Injectable()
 export class AuthService {
-    constructor(private readonly prisma: PrismaService,private readonly jwtService: JwtService){};
+    constructor(
+        private readonly prisma: PrismaService,
+        private readonly jwtService: JwtService, 
+        private readonly config: ConfigService
+    ){};
 
     private scrypt = promisify(_scrypt);
 
@@ -31,19 +37,22 @@ export class AuthService {
             throw new UnauthorizedException('Credenciais inválidas'); 
         }
 
-        // const payload = {username:email, sub: existUser.id}
-        // return {
-        //     access_token: this.jwtService.sign(payload),
-        // };
+        const { refreshToken, accessToken } = this.createTokens(existUser);
+
+        await this.prisma.user.update({ where: { email: email } ,data:{
+            refreshToken: refreshToken
+        }});
+
         return {
-            access_token: this.jwtService.sign(this.extractInfoUser(existUser))
+            access_token: accessToken,
+            refresh_token: refreshToken
         };
     }
     private extractInfoUser(existUser: any): CurrentUserDto{
         return {
             name: existUser.name,
             email: existUser.email,
-            userId: existUser.id
+            userId: existUser.id,
         };
     }
 
@@ -71,8 +80,66 @@ export class AuthService {
             }
         })
 
+        const { refreshToken, accessToken } = this.createTokens(prismaInfo);
+        
+        await this.prisma.user.update({ where: { email: email } ,data:{
+            refreshToken: refreshToken
+        }});
+
         return {
-            access_token: this.jwtService.sign(this.extractInfoUser(prismaInfo))
+            access_token: accessToken,
+            refresh_token: refreshToken
+        };
+    }
+
+    private createTokens(data: any) {
+
+        const extractUser = this.extractInfoUser(data);
+        
+        const accessToken = this.jwtService.sign(
+            { ...extractUser, type: "access" }
+        );
+        const refreshToken = this.jwtService.sign(
+            { ...extractUser, type: "refresh" },
+            { expiresIn: this.config.getOrThrow("REFRESH_EXPIRESS_IN") }
+        );
+        return { refreshToken, accessToken };
+    }
+
+    async refresh(params:RefreshTokenDto): Promise<AccessToken>{
+        const {refresh_token} = params;
+
+        let payload: any;
+
+        try {
+            payload = this.jwtService.verify(refresh_token);
+        } catch (error) {
+            throw new UnauthorizedException('Token inválido'); 
+        }
+
+        const existUser = await this.prisma.user.findFirst({
+            where: {
+                id: payload.userId,
+                refreshToken: refresh_token
+            }
+        });
+
+        if(payload.type !== 'refresh' || ! existUser){
+            throw new UnauthorizedException('Token inválido'); 
+        }
+
+        const { refreshToken, accessToken } = this.createTokens(existUser);
+
+        await this.prisma.user.update({
+            where: { id: existUser.id },
+            data: {
+                refreshToken: refreshToken
+            }
+        });
+
+        return {
+            access_token: accessToken,
+            refresh_token: refreshToken
         };
     }
 }
