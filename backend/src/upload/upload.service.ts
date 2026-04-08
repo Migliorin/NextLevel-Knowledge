@@ -91,9 +91,6 @@ export class UploadService {
         }
     }
 
-    async update(){
-
-    }
 
     private buildObjectName(userId: string) {
         return `${userId}/${randomUUID()}.pdf`;
