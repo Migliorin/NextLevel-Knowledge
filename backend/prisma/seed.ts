@@ -9,7 +9,6 @@ import { promisify } from "util";
 const scrypt = promisify(_scrypt);
 
 const connectionString = `${process.env.DATABASE_URL}`;
-const secret_key_password = `${process.env.PASSWORD_SECRET_KEY}`;
 const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
