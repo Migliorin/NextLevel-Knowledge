@@ -26,6 +26,8 @@ write_if_missing "$TARGET_DIR/minio_backend_access_key.txt" "backend-upload-user
 write_if_missing "$TARGET_DIR/minio_backend_secret_key.txt" "troque-esta-senha-backend"
 write_if_missing "$TARGET_DIR/minio_ai_access_key.txt" "ai-reader-user"
 write_if_missing "$TARGET_DIR/minio_ai_secret_key.txt" "troque-esta-senha-ia"
+write_if_missing "$TARGET_DIR/postgres_root_user.txt" "postgres"
+write_if_missing "$TARGET_DIR/postgres_root_password.txt" "troque-esta-senha-root"
 
 echo
 echo "Revise os arquivos em $TARGET_DIR antes de subir o compose."
