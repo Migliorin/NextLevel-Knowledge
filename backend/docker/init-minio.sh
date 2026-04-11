@@ -14,6 +14,9 @@ done
 
 mc mb --ignore-existing local/documents
 mc anonymous set none local/documents
+mc mb --ignore-existing local/extraction
+mc anonymous set none local/extraction
+
 mc admin policy create local documents-backend-policy /tmp/documents-backend-policy.json || true
 mc admin policy create local documents-ai-reader-policy /tmp/documents-ai-reader-policy.json || true
 mc admin user add local "$BACKEND_ACCESS_KEY" "$BACKEND_SECRET_KEY" || true
