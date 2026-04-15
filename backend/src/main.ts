@@ -5,6 +5,15 @@ import { AppModule } from './app.module.js';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const port = process.env.PORT;
+
+  if (!port) {
+    throw new Error('PORT nao configurado no ambiente.');
+  }
+
+  app.enableCors({
+    origin: true,
+  });
 
   const config = new DocumentBuilder()
   .setTitle('NextLevel Knowledge Backend API')
@@ -25,6 +34,6 @@ async function bootstrap() {
   const documentFactory = () => SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, documentFactory);
 
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(port);
 }
 bootstrap();
