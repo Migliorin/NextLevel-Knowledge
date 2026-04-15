@@ -56,8 +56,23 @@ export class AuthService {
         };
     }
 
+    private normalizeName(name: string): string {
+        const trimmedName = name.trim().replace(/\s+/g, ' ');
+
+        if (!/[ÃÂâ]/.test(trimmedName)) {
+            return trimmedName.normalize('NFC');
+        }
+
+        try {
+            return Buffer.from(trimmedName, 'latin1').toString('utf8').normalize('NFC');
+        } catch {
+            return trimmedName.normalize('NFC');
+        }
+    }
+
     async register(params: SignUpDto): Promise<AccessToken>{
         const {email, password, name} = params;
+        const normalizedName = this.normalizeName(name);
         const existUser = await this.prisma.user.findUnique({ where: { email: email } });
         
         if (existUser) {
@@ -76,7 +91,7 @@ export class AuthService {
             create: {
                 email: email,
                 password: passwordHash,
-                name: name
+                name: normalizedName
             }
         })
 
