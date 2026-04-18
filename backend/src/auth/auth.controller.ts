@@ -1,19 +1,22 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Headers, Post, UseGuards } from '@nestjs/common';
 import {
+  ApiBearerAuth,
   ApiBody,
   ApiCreatedResponse,
   ApiOperation,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { AuthService } from './auth.service.js';
-import { SignInDto } from '../dto/Auth/signIn.dto.js';
 import { AccessToken } from '../dto/Auth/accessToken.dto.js';
-import { SignUpDto } from '../dto/Auth/signUp.dto.js';
 import { RefreshTokenDto } from '../dto/Auth/refreshToken.dto.js';
+import { SignInDto } from '../dto/Auth/signIn.dto.js';
+import { SignUpDto } from '../dto/Auth/signUp.dto.js';
+import { AuthService } from './auth.service.js';
+import { CurrentUser } from './current-user.decorator.js';
+import { JwtAuthGuards } from './jwt-auth.guard.js';
 
 @ApiTags('Auth')
-@Controller('')
+@Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
@@ -49,6 +52,8 @@ export class AuthController {
   }
 
   @Post('refresh')
+  @UseGuards(JwtAuthGuards)
+  @ApiBearerAuth('jwt')
   @ApiOperation({ summary: 'Solicitar novo Access Token' })
   @ApiBody({
     type: RefreshTokenDto,
@@ -58,7 +63,21 @@ export class AuthController {
     description: 'Novo Access e Refresh Token',
     type: AccessToken,
   })
-  refresh(@Body() body: RefreshTokenDto): Promise<AccessToken>{
-    return this.authService.refresh(body);
+  refresh(
+    @Body() body: RefreshTokenDto,
+    @Headers('authorization') authorization?: string,
+  ): Promise<AccessToken> {
+    return this.authService.refresh(body, authorization);
+  }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuards)
+  @ApiBearerAuth('jwt')
+  @ApiOperation({ summary: 'Encerrar sessão do usuário' })
+  async logout(
+    @CurrentUser() user: { userId: number },
+    @Headers('authorization') authorization?: string,
+  ): Promise<void> {
+    return this.authService.logout(user.userId, authorization);
   }
 }
