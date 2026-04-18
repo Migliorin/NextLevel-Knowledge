@@ -11,9 +11,23 @@ services:
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_root_password
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - "${POSTGRES_PORT}:5432"
+      - '${POSTGRES_PORT}:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app_net
+
+  redis:
+    image: redis:8-alpine
+    container_name: redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --aclfile /run/secrets/redis_users_acl
+    secrets:
+      - redis_users_acl
+    ports:
+      - '${REDIS_PORT}:6379'
+    volumes:
+      - redis_data:/data
     networks:
       - app_net
 
@@ -21,8 +35,8 @@ services:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
     ports:
-      - "${MINIO_API_PORT}:9000"
-      - "${MINIO_CONSOLE_PORT}:9001"
+      - '${MINIO_API_PORT}:9000'
+      - '${MINIO_CONSOLE_PORT}:9001'
     secrets:
       - minio_root_user
       - minio_root_password
@@ -38,7 +52,7 @@ services:
     image: minio/mc:latest
     depends_on:
       - minio
-    entrypoint: ["/bin/sh", "/usr/local/bin/init-minio.sh"]
+    entrypoint: ['/bin/sh', '/usr/local/bin/init-minio.sh']
     secrets:
       - minio_root_user
       - minio_root_password
@@ -55,6 +69,7 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
   minio_data:
 
 secrets:
@@ -74,6 +89,8 @@ secrets:
     file: ./secrets/postgres_root_user.txt
   postgres_root_password:
     file: ./secrets/postgres_root_password.txt
+  redis_users_acl:
+    file: ./secrets/redis_users.acl
 
 networks:
   app_net:
