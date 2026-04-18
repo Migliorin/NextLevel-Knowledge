@@ -16,7 +16,7 @@ write_if_missing() {
   fi
 
   printf '%s\n' "$content" > "$target_file"
-  chmod 600 "$target_file"
+  chmod +r "$target_file"
   echo "Criado: $target_file"
 }
 

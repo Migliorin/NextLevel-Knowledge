@@ -18,4 +18,10 @@ export class ListFilesResponseDto {
     description: 'Data de criacao do registro do arquivo',
   })
   createdAt!: Date;
+
+  @ApiProperty({
+    example: false,
+    description: 'Status de extração do arquivo para RAG'
+  })
+  extracted!: boolean;
 }
