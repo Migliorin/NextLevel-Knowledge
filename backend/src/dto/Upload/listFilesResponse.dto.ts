@@ -20,8 +20,8 @@ export class ListFilesResponseDto {
   createdAt!: Date;
 
   @ApiProperty({
-    example: false,
-    description: 'Status de extração do arquivo para RAG'
+    example: 0,
+    description: 'Status de extracao do arquivo para RAG: 0 pendente, 1 extraindo, 2 extraido, 3 erro',
   })
-  extracted!: boolean;
+  status!: number;
 }

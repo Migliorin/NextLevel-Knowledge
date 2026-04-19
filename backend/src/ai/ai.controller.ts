@@ -41,4 +41,25 @@ export class AiController {
         ) {
             return this.uploadService.askDocument(id, user.userId, body.query);
         }
+
+        @Post(':id/extract')
+        @UseGuards(JwtAuthGuards)
+        @ApiOperation({ summary: 'Iniciar extracao de um documento para RAG' })
+        @ApiParam({
+            name: 'id',
+            description: 'ID do arquivo',
+            example: 1,
+        })
+        @ApiOkResponse({
+            description: 'Extracao iniciada e concluida com sucesso',
+        })
+        @ApiUnauthorizedResponse({
+            description: 'Token JWT ausente ou invalido',
+        })
+        extractDocument(
+            @Param('id') id: string,
+            @CurrentUser() user: CurrentUserDto,
+        ) {
+            return this.uploadService.extractDocument(id, user.userId);
+        }
 }

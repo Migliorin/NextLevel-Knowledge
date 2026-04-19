@@ -6,6 +6,13 @@ import { UploadResponseDto } from '../dto/Upload/uploadResponse.dto.js';
 import { MINIO_CLIENT } from '../minio/minio.constants.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
+export const FILE_STATUS = {
+    PENDING: 0,
+    EXTRACTING: 1,
+    EXTRACTED: 2,
+    ERROR: 3,
+} as const;
+
 @Injectable()
 export class FilesService {
 
@@ -110,7 +117,7 @@ export class FilesService {
             select:{
                 id: true,
                 name: true,
-                extracted: true,
+                status: true,
                 createdAt: true,
             },
             orderBy: {
@@ -144,7 +151,7 @@ export class FilesService {
                 id: true,
                 name: true,
                 path: true,
-                extracted: true,
+                status: true,
                 createdAt: true,
             },
         });
@@ -167,6 +174,25 @@ export class FilesService {
             name: file.name,
             stream,
         };
+    }
+
+    async updateExtractionStatus(fileId: string, userId: string, status: number) {
+        const file = await this.findOne(fileId, userId);
+
+        return this.prisma.files.update({
+            where: {
+                id: file.id,
+            },
+            data: {
+                status,
+            },
+            select: {
+                id: true,
+                name: true,
+                status: true,
+                createdAt: true,
+            },
+        });
     }
 
     private buildObjectName(userId: string) {
