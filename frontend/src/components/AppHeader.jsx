@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { avatarPhoto } from "../constants/media";
 import { ROUTES } from "../routes";
-import { clearAuthTokens, getCurrentUser } from "../services/auth";
+import { getCurrentUser, logout } from "../services/auth";
 import { Icon } from "./Icon";
 
 export function AppHeader({ goTo, activeSection = "documents" }) {
@@ -25,8 +25,8 @@ export function AppHeader({ goTo, activeSection = "documents" }) {
     return () => document.removeEventListener("mousedown", closeOnOutsideClick);
   }, [isUserMenuOpen]);
 
-  const handleLogout = () => {
-    clearAuthTokens();
+  const handleLogout = async () => {
+    await logout();
     goTo(ROUTES.login);
   };
 

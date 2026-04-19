@@ -6,6 +6,7 @@ import { defaultChatMessages, getChatHistory, saveChatHistory } from "../service
 import { askDocumentQuestion, listPdfFiles } from "../services/documents";
 
 export function ChatPage({ goTo }) {
+  const chatScrollRef = useRef(null);
   const messagesEndRef = useRef(null);
   const [documents, setDocuments] = useState([]);
   const [selectedDocumentId, setSelectedDocumentId] = useState("");
@@ -21,7 +22,16 @@ export function ChatPage({ goTo }) {
   );
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    requestAnimationFrame(() => {
+      chatScrollRef.current?.scrollTo({
+        top: chatScrollRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+      window.scrollTo({
+        top: document.documentElement.scrollHeight,
+        behavior: "smooth",
+      });
+    });
   }, [messages]);
 
   useEffect(() => {
@@ -49,8 +59,12 @@ export function ChatPage({ goTo }) {
       try {
         const files = await listPdfFiles();
         if (isActive) {
+          const preferredDocumentId = window.sessionStorage.getItem("selected_chat_document_id");
+          const initialDocument = files.find((file) => String(file.id) === preferredDocumentId) || files[0];
+
           setDocuments(files);
-          setSelectedDocumentId(files[0]?.id ? String(files[0].id) : "");
+          setSelectedDocumentId(initialDocument?.id ? String(initialDocument.id) : "");
+          window.sessionStorage.removeItem("selected_chat_document_id");
         }
       } catch (error) {
         if (isActive) {
@@ -155,7 +169,7 @@ export function ChatPage({ goTo }) {
           </section>
 
           <section className="flex min-h-[520px] flex-1 flex-col rounded-xl border border-outline-variant/20 bg-surface-container-lowest">
-            <div className="max-h-[calc(100vh-360px)] min-h-[360px] flex-1 space-y-5 overflow-y-auto p-4">
+            <div ref={chatScrollRef} className="max-h-[calc(100vh-360px)] min-h-[360px] flex-1 space-y-5 overflow-y-auto p-4">
               {messages.map((message, index) => (
                 <div
                   className={`flex items-start gap-3 ${message.role === "user" ? "flex-row-reverse" : "flex-row"}`}

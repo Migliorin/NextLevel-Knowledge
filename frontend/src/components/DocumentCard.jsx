@@ -1,6 +1,30 @@
+import { useEffect, useRef, useState } from "react";
 import { Icon } from "./Icon";
 
 export function DocumentCard({ doc, onOpen }) {
+  const actionMenuRef = useRef(null);
+  const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isActionMenuOpen) {
+      return undefined;
+    }
+
+    const closeOnOutsideClick = (event) => {
+      if (!actionMenuRef.current?.contains(event.target)) {
+        setIsActionMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
+  }, [isActionMenuOpen]);
+
+  const handleOpen = () => {
+    setIsActionMenuOpen(false);
+    onOpen?.(doc);
+  };
+
   return (
     <article className="group rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-5 transition-all hover:border-primary/30 hover:shadow-sm">
       <div className="mb-4 flex items-start gap-4">
@@ -34,19 +58,42 @@ export function DocumentCard({ doc, onOpen }) {
             </div>
           )}
         </div>
-        <button className="text-on-surface-variant hover:text-on-surface" type="button" aria-label="Mais acoes">
-          <Icon className="text-xl">more_vert</Icon>
-        </button>
+        <div className="relative" ref={actionMenuRef}>
+          <button
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-on-surface"
+            type="button"
+            aria-label={`Abrir menu de acoes de ${doc.title}`}
+            aria-expanded={isActionMenuOpen}
+            onClick={() => setIsActionMenuOpen((current) => !current)}
+          >
+            <Icon className="text-xl">more_vert</Icon>
+          </button>
+          {isActionMenuOpen ? (
+            <div
+              className="absolute right-0 top-11 z-20 w-48 rounded-lg border border-outline-variant/20 bg-surface-container-lowest p-1 shadow-xl shadow-on-surface/10"
+              onMouseLeave={() => setIsActionMenuOpen(false)}
+            >
+              <button
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-low"
+                type="button"
+                onClick={handleOpen}
+              >
+                <Icon className="text-lg">visibility</Icon>
+                Visualizar PDF
+              </button>
+            </div>
+          ) : null}
+        </div>
       </div>
       <div className="flex items-center justify-between border-t border-outline-variant/10 pt-3">
-        <button className="text-xs font-bold text-primary hover:underline" type="button" onClick={() => onOpen?.(doc)}>
+        <button className="text-xs font-bold text-primary hover:underline" type="button" onClick={handleOpen}>
           {doc.action || "Abrir documento"}
         </button>
         <button
           className="text-on-surface-variant transition-colors hover:text-primary"
           type="button"
           aria-label="Abrir"
-          onClick={() => onOpen?.(doc)}
+          onClick={handleOpen}
         >
           <Icon className="text-lg">chat</Icon>
         </button>

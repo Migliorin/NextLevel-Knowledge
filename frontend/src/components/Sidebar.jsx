@@ -15,10 +15,6 @@ export function Sidebar({ activeItem = "library", goTo }) {
       </div>
       <SidebarNav activeItem={activeItem} goTo={goTo} />
       <div className="mt-auto border-t border-slate-200 pt-4">
-        <button className="signature-gradient mb-4 flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold text-white shadow-lg shadow-primary/20">
-          <Icon className="text-sm">upload_file</Icon>
-          Analyze PDF
-        </button>
         <button className="flex w-full items-center gap-3 px-4 py-3 text-left text-slate-600 transition-all hover:bg-slate-200/50">
           <Icon>help_outline</Icon>
           <span>Help Center</span>

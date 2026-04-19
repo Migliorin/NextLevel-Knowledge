@@ -4,6 +4,7 @@ import { ROUTES } from "../routes";
 const sidebarItems = [
   ["library", "folder_open", "Library", ROUTES.dashboard],
   ["chat", "smart_toy", "AI Chat", ROUTES.chat],
+  ["reports", "summarize", "Relatórios", ROUTES.reports],
 ];
 
 export function SidebarNav({ activeItem = "library", goTo }) {

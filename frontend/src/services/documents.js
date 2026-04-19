@@ -1,40 +1,11 @@
-import { getStoredAccessToken } from "./auth";
-import { API_BASE_URL } from "../config/api";
-
-async function parseApiError(response) {
-  try {
-    const body = await response.json();
-    if (Array.isArray(body.message)) {
-      return body.message.join(" ");
-    }
-    return body.message || body.error || "Nao foi possivel concluir a operacao.";
-  } catch {
-    return "Nao foi possivel concluir a operacao.";
-  }
-}
-
-function getAuthHeaders() {
-  const token = getStoredAccessToken();
-  if (!token) {
-    throw new Error("Sessao expirada. Faca login novamente.");
-  }
-
-  return {
-    Authorization: `Bearer ${token}`,
-  };
-}
+import { API_ROUTES } from "../config/api";
+import { apiFetch } from "./apiClient";
 
 export async function listPdfFiles() {
-  const response = await fetch(`${API_BASE_URL}/documents`, {
+  return apiFetch(API_ROUTES.files.list, {
     method: "GET",
-    headers: getAuthHeaders(),
+    errorMessage: "Nao foi possivel concluir a operacao.",
   });
-
-  if (!response.ok) {
-    throw new Error(await parseApiError(response));
-  }
-
-  return response.json();
 }
 
 export async function uploadPdfFiles(files) {
@@ -43,45 +14,32 @@ export async function uploadPdfFiles(files) {
     formData.append("files", file);
   });
 
-  const response = await fetch(`${API_BASE_URL}/documents/upload`, {
+  return apiFetch(API_ROUTES.files.upload, {
     method: "POST",
-    headers: getAuthHeaders(),
     body: formData,
+    errorMessage: "Nao foi possivel concluir a operacao.",
   });
-
-  if (!response.ok) {
-    throw new Error(await parseApiError(response));
-  }
-
-  return response.json();
 }
 
 export async function getPdfFile(documentId) {
-  const response = await fetch(`${API_BASE_URL}/documents/${documentId}`, {
+  return apiFetch(API_ROUTES.files.byId(documentId), {
     method: "GET",
-    headers: getAuthHeaders(),
+    responseType: "blob",
+    errorMessage: "Nao foi possivel concluir a operacao.",
   });
-
-  if (!response.ok) {
-    throw new Error(await parseApiError(response));
-  }
-
-  return response.blob();
 }
 
 export async function askDocumentQuestion(documentId, query) {
-  const response = await fetch(`${API_BASE_URL}/documents/${documentId}/search`, {
+  return apiFetch(API_ROUTES.ai.askDocument(documentId), {
     method: "POST",
-    headers: {
-      ...getAuthHeaders(),
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ query }),
+    json: { query },
+    errorMessage: "Nao foi possivel concluir a operacao.",
   });
+}
 
-  if (!response.ok) {
-    throw new Error(await parseApiError(response));
-  }
-
-  return response.json();
+export async function startDocumentExtraction(documentId) {
+  return apiFetch(API_ROUTES.ai.extractDocument(documentId), {
+    method: "POST",
+    errorMessage: "Nao foi possivel iniciar a extracao do documento.",
+  });
 }
