@@ -14,6 +14,14 @@ export class ListFilesResponseDto {
   name!: string;
 
   @ApiProperty({
+    example: 'Relatorio financeiro do Q2 com receita, custos e projecoes.',
+    description: 'Descricao breve informada no upload',
+    nullable: true,
+    required: false,
+  })
+  description?: string | null;
+
+  @ApiProperty({
     example: '2026-04-15T12:00:00.000Z',
     description: 'Data de criacao do registro do arquivo',
   })
@@ -24,4 +32,10 @@ export class ListFilesResponseDto {
     description: 'Status de extracao do arquivo para RAG: 0 pendente, 1 extraindo, 2 extraido, 3 erro',
   })
   status!: number;
+
+  @ApiProperty({
+    example: 0,
+    description: 'ID do status de extracao do arquivo para RAG',
+  })
+  statusId!: number;
 }

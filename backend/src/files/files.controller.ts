@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Get, Header, Param, Post, Res, StreamableFile, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Header, Param, Post, Query, Res, StreamableFile, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ApiBadRequestResponse, ApiBearerAuth, ApiConsumes, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiParam, ApiTags, ApiUnauthorizedResponse, ApiBody as SwaggerApiBody } from '@nestjs/swagger';
 import type { Response } from 'express';
@@ -41,6 +41,11 @@ export class FilesController {
             type: 'object',
             required: ['files'],
             properties: {
+                description: {
+                    type: 'string',
+                    description: 'Descricao breve exibida na biblioteca e usada para identificar o PDF',
+                    example: 'Relatorio financeiro do Q2 com receita, custos e projecoes.',
+                },
                 files: {
                     type: 'array',
                     items: {
@@ -63,8 +68,12 @@ export class FilesController {
     @ApiUnauthorizedResponse({
         description: 'Token JWT ausente ou invalido',
     })
-    uploadFiles(@UploadedFiles() uploadedFiles: Express.Multer.File[], @CurrentUser() user: CurrentUserDto) {
-        return this.filesService.uploadFiles(uploadedFiles, user.userId);
+    uploadFiles(
+        @UploadedFiles() uploadedFiles: Express.Multer.File[],
+        @CurrentUser() user: CurrentUserDto,
+        @Body('description') description?: string,
+    ) {
+        return this.filesService.uploadFiles(uploadedFiles, user.userId, description);
     }
 
     @Get("")
@@ -79,8 +88,16 @@ export class FilesController {
     })
     findMany(
         @CurrentUser() user: CurrentUserDto,
+        @Query('page') page?: string,
+        @Query('limit') limit?: string,
+        @Query('search') search?: string,
     ) {
-        return this.filesService.findMany(user.userId);
+        return this.filesService.findMany(user.userId, {
+            limit,
+            page,
+            paginated: Boolean(page || limit || search),
+            search,
+        });
     }
 
     @Get(":id")
@@ -115,5 +132,25 @@ export class FilesController {
         response.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(file.name)}"`);
         return new StreamableFile(file.stream);
     }
-}
 
+    @Delete(":id")
+    @UseGuards(JwtAuthGuards)
+    @ApiOperation({ summary: 'Excluir arquivo PDF' })
+    @ApiParam({
+        name: 'id',
+        description: 'ID do arquivo',
+        example: 1,
+    })
+    @ApiOkResponse({
+        description: 'Arquivo excluido com sucesso',
+    })
+    @ApiUnauthorizedResponse({
+        description: 'Token JWT ausente ou invalido',
+    })
+    deleteFile(
+        @CurrentUser() user: CurrentUserDto,
+        @Param("id") id: string,
+    ) {
+        return this.filesService.deleteFile(id, user.userId);
+    }
+}

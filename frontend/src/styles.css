@@ -32,6 +32,111 @@
     backdrop-filter: blur(12px);
   }
 
+  .auth-glass-panel {
+    background: rgba(29, 30, 50, 0.4);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .auth-data-path {
+    position: absolute;
+    height: 1px;
+    width: 100%;
+    background: linear-gradient(90deg, transparent, rgba(165, 231, 255, 0.3), transparent);
+  }
+
+  .auth-glow-button {
+    background: linear-gradient(135deg, #47d6ff 0%, #6e208c 100%);
+    transition: all 0.3s ease;
+  }
+
+  .auth-glow-button:hover {
+    box-shadow: 0 0 20px rgba(71, 214, 255, 0.4);
+    transform: translateY(-1px);
+  }
+
+  .auth-input-focus-line {
+    transition: all 0.3s ease;
+  }
+
+  .auth-input:focus + .auth-input-focus-line {
+    width: 100%;
+    background: #a5e7ff;
+    box-shadow: 0 0 8px rgba(165, 231, 255, 0.5);
+  }
+
+  .auth-mesh-container {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    background: #0b0c1f;
+  }
+
+  .auth-mesh-svg {
+    width: 100%;
+    height: 100%;
+    opacity: 0.4;
+  }
+
+  .auth-node {
+    fill: #47d6ff;
+    animation: auth-pulse 4s infinite ease-in-out;
+  }
+
+  .auth-connection {
+    stroke: #47d6ff;
+    stroke-width: 0.5;
+    stroke-opacity: 0.2;
+    stroke-dasharray: 4, 4;
+    animation: auth-dash 20s linear infinite;
+  }
+
+  .auth-flowing-gradient {
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background:
+      radial-gradient(circle at 50% 50%, rgba(110, 32, 140, 0.15) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, rgba(71, 214, 255, 0.1) 0%, transparent 40%);
+    animation: auth-rotate 30s linear infinite;
+  }
+
+  @keyframes auth-pulse {
+    0%,
+    100% {
+      opacity: 0.2;
+      transform: scale(1);
+    }
+
+    50% {
+      opacity: 0.6;
+      transform: scale(1.2);
+    }
+  }
+
+  @keyframes auth-dash {
+    from {
+      stroke-dashoffset: 100;
+    }
+
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  @keyframes auth-rotate {
+    from {
+      transform: rotate(0deg);
+    }
+
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
   .signature-gradient,
   .scholar-gradient {
     background: linear-gradient(135deg, #00346f 0%, #004a99 100%);

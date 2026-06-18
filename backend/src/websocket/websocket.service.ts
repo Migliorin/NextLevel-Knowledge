@@ -9,7 +9,7 @@ export class WebsocketService {
         time=60000, 
         msgError='Nao foi possivel comunicar com a IA', 
         msgTypeInvalid='Resposta invalida recebida da IA'
-    ) {
+    ) : Promise<string>{
         return new Promise((resolve, reject) => {
             const socket = new WebSocket(url);
             const timeout = setTimeout(() => {

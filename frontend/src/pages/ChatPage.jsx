@@ -1,38 +1,48 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AppHeader } from "../components/AppHeader";
+import { AppLayout } from "../components/AppLayout";
+import { ChatConversation } from "../components/chat/ChatConversation";
+import { DocumentPickerModal } from "../components/DocumentPickerModal";
+import { EvidencePanel } from "../components/EvidencePanel";
 import { Icon } from "../components/Icon";
-import { Sidebar } from "../components/Sidebar";
 import { defaultChatMessages, getChatHistory, saveChatHistory } from "../services/chatCache";
 import { askDocumentQuestion, listPdfFiles } from "../services/documents";
+import {
+  buildFallbackEvidenceTrace,
+  buildLoadingEvidenceTrace,
+  normalizeEvidenceTrace,
+} from "../utils/evidenceTrace";
 
 export function ChatPage({ goTo }) {
-  const chatScrollRef = useRef(null);
   const messagesEndRef = useRef(null);
+
   const [documents, setDocuments] = useState([]);
   const [selectedDocumentId, setSelectedDocumentId] = useState("");
+  const [isDocumentPickerOpen, setIsDocumentPickerOpen] = useState(false);
+
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState(defaultChatMessages);
+
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(true);
   const [documentsError, setDocumentsError] = useState("");
   const [isAsking, setIsAsking] = useState(false);
+  const [evidenceTrace, setEvidenceTrace] = useState(null);
 
   const selectedDocument = useMemo(
-    () => documents.find((document) => String(document.id) === selectedDocumentId),
+    () => documents.find((document) => String(document.id) === String(selectedDocumentId)),
     [documents, selectedDocumentId],
   );
 
+  const isChatDisabled = isAsking || !selectedDocument || Boolean(documentsError);
+  const canSubmit = Boolean(question.trim()) && !isChatDisabled;
+
   useEffect(() => {
     requestAnimationFrame(() => {
-      chatScrollRef.current?.scrollTo({
-        top: chatScrollRef.current.scrollHeight,
+      messagesEndRef.current?.scrollIntoView({
         behavior: "smooth",
-      });
-      window.scrollTo({
-        top: document.documentElement.scrollHeight,
-        behavior: "smooth",
+        block: "end",
       });
     });
-  }, [messages]);
+  }, [messages, isAsking]);
 
   useEffect(() => {
     if (!selectedDocumentId) {
@@ -58,17 +68,24 @@ export function ChatPage({ goTo }) {
 
       try {
         const files = await listPdfFiles();
-        if (isActive) {
-          const preferredDocumentId = window.sessionStorage.getItem("selected_chat_document_id");
-          const initialDocument = files.find((file) => String(file.id) === preferredDocumentId) || files[0];
 
-          setDocuments(files);
-          setSelectedDocumentId(initialDocument?.id ? String(initialDocument.id) : "");
-          window.sessionStorage.removeItem("selected_chat_document_id");
+        if (!isActive) {
+          return;
         }
+
+        const preferredDocumentId = window.sessionStorage.getItem("selected_chat_document_id");
+        const preferredDocument = files.find(
+          (file) => String(file.id) === String(preferredDocumentId),
+        );
+
+        setDocuments(files);
+        setSelectedDocumentId(preferredDocument ? String(preferredDocument.id) : "");
+        window.sessionStorage.removeItem("selected_chat_document_id");
       } catch (error) {
         if (isActive) {
-          setDocumentsError(error instanceof Error ? error.message : "Nao foi possivel carregar seus PDFs.");
+          setDocumentsError(
+            error instanceof Error ? error.message : "Não foi possível carregar seus PDFs.",
+          );
         }
       } finally {
         if (isActive) {
@@ -84,40 +101,71 @@ export function ChatPage({ goTo }) {
     };
   }, []);
 
+  const handleSelectDocument = (document) => {
+    setSelectedDocumentId(String(document.id));
+    setEvidenceTrace(null);
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
+
     const trimmedQuestion = question.trim();
 
     if (!trimmedQuestion || !selectedDocument) {
       return;
     }
 
+    const loadingTrace = buildLoadingEvidenceTrace({
+      document: selectedDocument,
+      question: trimmedQuestion,
+    });
+
     setIsAsking(true);
+    setQuestion("");
+    setEvidenceTrace(loadingTrace);
+
     setMessages((current) => [
       ...current,
       {
-        role: "user",
         content: trimmedQuestion,
         documentName: selectedDocument.name,
+        role: "user",
       },
     ]);
-    setQuestion("");
 
     try {
       const response = await askDocumentQuestion(selectedDocument.id, trimmedQuestion);
+
+      const fallbackTrace = buildFallbackEvidenceTrace({
+        document: selectedDocument,
+        question: trimmedQuestion,
+      });
+
+      setEvidenceTrace(normalizeEvidenceTrace(response, fallbackTrace));
+
       setMessages((current) => [
         ...current,
         {
+          content: response.answer || "A IA não retornou uma resposta para esta pergunta.",
           role: "assistant",
-          content: response.answer || "A IA nao retornou uma resposta para esta pergunta.",
         },
       ]);
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Não foi possível consultar a IA.";
+
+      setEvidenceTrace({
+        ...loadingTrace,
+        error: errorMessage,
+        query: trimmedQuestion,
+        status: "error",
+      });
+
       setMessages((current) => [
         ...current,
         {
+          content: errorMessage,
           role: "assistant",
-          content: error instanceof Error ? error.message : "Nao foi possivel consultar a IA.",
         },
       ]);
     } finally {
@@ -126,105 +174,44 @@ export function ChatPage({ goTo }) {
   };
 
   return (
-    <div className="min-h-screen bg-background text-on-surface">
-      <Sidebar activeItem="chat" goTo={goTo} />
-      <main className="min-h-screen md:ml-64">
-        <AppHeader goTo={goTo} activeSection="documents" />
+    <AppLayout activeItem="chat" goTo={goTo}>
+      <div className="mx-auto flex min-h-[calc(100vh-73px)] max-w-[1180px] flex-col px-5 py-8 md:px-8">
+        <section className="mb-6">
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.2em] text-auth-primary shadow-lg shadow-black/10">
+            <Icon className="text-base">auto_awesome</Icon>
+            AI Document Intelligence
+          </div>
+        </section>
 
-        <div className="mx-auto flex min-h-[calc(100vh-73px)] max-w-7xl flex-col px-5 py-8 md:px-8">
-          <section className="mb-6">
-            <h2 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">AI Chat</h2>
-            <p className="mt-2 text-sm text-on-surface-variant">
-              Selecione um PDF e envie perguntas sobre o conteudo do documento.
-            </p>
-          </section>
+        <div className="grid min-h-0 flex-1 gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
+          <EvidencePanel trace={evidenceTrace} selectedDocument={selectedDocument} />
 
-          <section className="mb-4 rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-4">
-            <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-on-surface-variant" htmlFor="chat-document">
-              Documento
-            </label>
-            <div className="relative">
-              <Icon className="absolute left-4 top-1/2 -translate-y-1/2 text-xl text-outline">picture_as_pdf</Icon>
-              <select
-                className="w-full rounded-lg border-none bg-surface-container-low py-3 pl-12 pr-4 text-sm font-medium text-on-surface focus:bg-surface-container-lowest focus:ring-1 focus:ring-primary/40"
-                id="chat-document"
-                value={selectedDocumentId}
-                onChange={(event) => setSelectedDocumentId(event.target.value)}
-                disabled={isLoadingDocuments || Boolean(documentsError) || !documents.length}
-              >
-                {documents.length ? (
-                  documents.map((document) => (
-                    <option value={document.id} key={document.id}>
-                      {document.name}
-                    </option>
-                  ))
-                ) : (
-                  <option value="">Nenhum PDF disponivel</option>
-                )}
-              </select>
-            </div>
-            {documentsError ? (
-              <p className="mt-2 text-sm font-medium text-error">{documentsError}</p>
-            ) : null}
-          </section>
-
-          <section className="flex min-h-[520px] flex-1 flex-col rounded-xl border border-outline-variant/20 bg-surface-container-lowest">
-            <div ref={chatScrollRef} className="max-h-[calc(100vh-360px)] min-h-[360px] flex-1 space-y-5 overflow-y-auto p-4">
-              {messages.map((message, index) => (
-                <div
-                  className={`flex items-start gap-3 ${message.role === "user" ? "flex-row-reverse" : "flex-row"}`}
-                  key={`${message.role}-${index}`}
-                >
-                  <div
-                    className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ${
-                      message.role === "user" ? "bg-primary text-on-primary" : "bg-surface-container-high text-primary"
-                    }`}
-                    aria-label={message.role === "user" ? "Usuario" : "IA"}
-                  >
-                    <Icon className="text-lg">{message.role === "user" ? "person" : "smart_toy"}</Icon>
-                  </div>
-                  <div
-                    className={`max-w-[80%] rounded-lg px-4 py-3 text-sm shadow-sm ${
-                      message.role === "user"
-                        ? "bg-primary text-on-primary"
-                        : "border border-outline-variant/20 bg-surface-container-low text-on-surface"
-                    }`}
-                  >
-                    <p className="mb-1 text-[10px] font-bold uppercase opacity-70">
-                      {message.role === "user" ? "Voce" : "IA"}
-                    </p>
-                    {message.documentName ? (
-                      <p className="mb-1 text-[10px] font-bold uppercase opacity-70">{message.documentName}</p>
-                    ) : null}
-                    <p>{message.content}</p>
-                  </div>
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-
-            <form className="border-t border-outline-variant/10 p-4" onSubmit={handleSubmit}>
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <input
-                  className="min-h-12 flex-1 rounded-lg border-none bg-surface-container-low px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:bg-surface-container-lowest focus:ring-1 focus:ring-primary/40"
-                  placeholder="Digite sua pergunta sobre o PDF..."
-                  type="text"
-                  value={question}
-                  onChange={(event) => setQuestion(event.target.value)}
-                  disabled={isAsking || !selectedDocument || Boolean(documentsError)}
-                />
-                <button
-                  className="signature-gradient rounded-lg px-6 py-3 text-sm font-bold text-white shadow-md transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-                  type="submit"
-                  disabled={isAsking || !question.trim() || !selectedDocument || Boolean(documentsError)}
-                >
-                  {isAsking ? "Consultando..." : "Enviar"}
-                </button>
-              </div>
-            </form>
-          </section>
+          <ChatConversation
+            canSubmit={canSubmit}
+            documentsError={documentsError}
+            isAsking={isAsking}
+            isChatDisabled={isChatDisabled}
+            isLoadingDocuments={isLoadingDocuments}
+            messages={messages}
+            messagesEndRef={messagesEndRef}
+            onOpenDocumentPicker={() => setIsDocumentPickerOpen(true)}
+            onQuestionChange={setQuestion}
+            onSubmit={handleSubmit}
+            question={question}
+            selectedDocument={selectedDocument}
+          />
         </div>
-      </main>
-    </div>
+      </div>
+
+      <DocumentPickerModal
+        isOpen={isDocumentPickerOpen}
+        onClose={() => setIsDocumentPickerOpen(false)}
+        documents={documents}
+        selectedDocumentId={selectedDocumentId}
+        onSelectDocument={handleSelectDocument}
+        isLoading={isLoadingDocuments}
+        error={documentsError}
+      />
+    </AppLayout>
   );
 }

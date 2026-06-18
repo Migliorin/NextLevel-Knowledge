@@ -31,35 +31,31 @@ export class AiService {
 
     async extractDocument(fileId: string, userId: string) {
         const file = await this.filesService.findOne(fileId, userId);
-        const aiUrl =
-            this.configService.get<string>('AI_DOCUMENT_EXTRACT_WS_URL') ??
-            this.configService.getOrThrow('AI_DOCUMENT_SEARCH_WS_URL');
+        if((file.statusId !== FILE_STATUS.PENDING) && (file.statusId !== FILE_STATUS.ERROR)){
+            throw new BadRequestException('Arquivo em processo de extração')
+        }
+        const aiUrl = this.configService.getOrThrow('AI_DOCUMENT_EXTRACT_WS_URL');
         const documentProtocolId = this.websocketService.extractDocumentProtocolId(file.path);
 
-        await this.filesService.updateExtractionStatus(
-            fileId,
-            userId,
-            FILE_STATUS.EXTRACTING,
-        );
-
         try {
-            const result = await this.websocketService.sendProtocolWebsocketAI(
+            await this.filesService.updateExtractionStatus(
+                fileId,
+                userId,
+                FILE_STATUS.EXTRACTING,
+            );
+
+            await this.websocketService.sendProtocolWebsocketAI(
                 aiUrl,
                 documentProtocolId,
-                120000,
+                5000,
                 'Nao foi possivel iniciar a extracao do documento na IA',
                 'Resposta invalida recebida da IA ao extrair o documento',
             );
-            const updatedFile = await this.filesService.updateExtractionStatus(
-                fileId,
-                userId,
-                FILE_STATUS.EXTRACTED,
-            );
 
             return {
-                document_id: updatedFile.id,
-                status: updatedFile.status,
-                result,
+                documentProtocolId,
+                status: FILE_STATUS.EXTRACTING,
+                statusId: FILE_STATUS.EXTRACTING,
             };
         } catch (error) {
             await this.filesService.updateExtractionStatus(
@@ -68,7 +64,7 @@ export class AiService {
                 FILE_STATUS.ERROR,
             );
 
-            throw error;
+            throw new BadRequestException("Erro ao iniciar extração de arquivo");
         }
     }
 

@@ -4,7 +4,6 @@ import { ChatPage } from "./pages/ChatPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { DocumentViewerPage } from "./pages/DocumentViewerPage";
 import { LoginPage } from "./pages/LoginPage";
-import { ReportsPage } from "./pages/ReportsPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { ROUTES } from "./routes";
 import { AUTH_SESSION_EXPIRED_EVENT } from "./services/apiClient";
@@ -54,14 +53,6 @@ export default function App() {
         element={
           <ProtectedRoute>
             <ChatPage goTo={goTo} />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path={ROUTES.reports}
-        element={
-          <ProtectedRoute>
-            <ReportsPage goTo={goTo} />
           </ProtectedRoute>
         }
       />

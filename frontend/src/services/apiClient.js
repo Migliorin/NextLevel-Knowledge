@@ -1,4 +1,5 @@
-import { API_ROUTES, apiUrl } from "../config/api";
+import axios from "axios";
+import { API_BASE_URL, API_ROUTES } from "../config/api";
 import {
   clearAuthTokens,
   getStoredAccessToken,
@@ -9,44 +10,78 @@ import {
 
 export const AUTH_SESSION_EXPIRED_EVENT = "auth:session-expired";
 
+const baseURL = API_BASE_URL.replace(/\/$/, "");
+
+export const apiClient = axios.create({
+  baseURL: baseURL || undefined,
+});
+
 function expireSession() {
   clearAuthTokens();
   window.dispatchEvent(new CustomEvent(AUTH_SESSION_EXPIRED_EVENT));
 }
 
-async function parseApiError(response, fallbackMessage = "Nao foi possivel concluir a operacao.") {
-  try {
-    const body = await response.json();
-    if (Array.isArray(body.message)) {
-      return body.message.join(" ");
-    }
-    return body.message || body.error || fallbackMessage;
-  } catch {
-    return fallbackMessage;
+function getApiErrorMessage(error, fallbackMessage = "Nao foi possivel concluir a operacao.") {
+  if (!axios.isAxiosError(error)) {
+    return error instanceof Error ? error.message : fallbackMessage;
   }
+
+  const body = error.response?.data;
+
+  if (!body) {
+    return error.message || fallbackMessage;
+  }
+
+  if (typeof body === "string") {
+    return body || fallbackMessage;
+  }
+
+  if (Array.isArray(body.message)) {
+    return body.message.join(" ");
+  }
+
+  return body.message || body.error || fallbackMessage;
 }
 
-function buildHeaders({ auth, headers, body, json }) {
-  const requestHeaders = new Headers(headers);
+function getAxiosResponseType(responseType) {
+  if (responseType === "blob" || responseType === "text") {
+    return responseType;
+  }
+
+  return "json";
+}
+
+function buildRequestConfig({
+  auth,
+  body,
+  headers,
+  json,
+  responseType,
+  ...axiosOptions
+}) {
+  const requestHeaders = { ...(headers || {}) };
 
   if (auth) {
     const token = getStoredAccessToken();
+
     if (!token) {
       expireSession();
       throw new Error("Sessao expirada. Faca login novamente.");
     }
-    requestHeaders.set("Authorization", `Bearer ${token}`);
+
+    requestHeaders.Authorization = `Bearer ${token}`;
   }
 
-  if (json !== undefined && !requestHeaders.has("Content-Type")) {
-    requestHeaders.set("Content-Type", "application/json");
+  if (json !== undefined && !requestHeaders["Content-Type"]) {
+    requestHeaders["Content-Type"] = "application/json";
   }
 
-  if (body instanceof FormData) {
-    requestHeaders.delete("Content-Type");
-  }
-
-  return requestHeaders;
+  return {
+    ...axiosOptions,
+    data: json !== undefined ? json : body,
+    headers: requestHeaders,
+    responseType: getAxiosResponseType(responseType),
+  };
 }
 
 async function refreshStoredTokens() {
@@ -58,83 +93,71 @@ async function refreshStoredTokens() {
     throw new Error("Sessao expirada. Faca login novamente.");
   }
 
-  const response = await fetch(apiUrl(API_ROUTES.auth.refresh), {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ refresh_token: refreshToken }),
-  });
+  try {
+    const response = await apiClient.request({
+      method: "POST",
+      url: API_ROUTES.auth.refresh,
+      data: { refresh_token: refreshToken },
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
 
-  if (!response.ok) {
-    const message = await parseApiError(response, "Sessao expirada. Faca login novamente.");
+    saveAuthTokens(response.data, shouldPersistAuthTokens());
+    return response.data;
+  } catch (error) {
+    const message = getApiErrorMessage(error, "Sessao expirada. Faca login novamente.");
     expireSession();
     throw new Error(message);
   }
-
-  const tokens = await response.json();
-  saveAuthTokens(tokens, shouldPersistAuthTokens());
-  return tokens;
 }
 
-async function parseResponse(response, responseType) {
+function parseResponse(response, responseType) {
   if (responseType === "response") {
     return response;
-  }
-
-  if (responseType === "blob") {
-    return response.blob();
-  }
-
-  if (responseType === "text") {
-    return response.text();
   }
 
   if (responseType === "empty" || response.status === 204) {
     return undefined;
   }
 
-  return response.json();
+  return response.data;
 }
 
 export async function apiFetch(route, options = {}) {
   const {
     auth = true,
-    body,
     errorMessage,
-    headers,
-    json,
     retryOnUnauthorized = auth,
     responseType = "json",
-    ...fetchOptions
+    ...requestOptions
   } = options;
 
-  const requestBody = json !== undefined ? JSON.stringify(json) : body;
-  const requestHeaders = buildHeaders({ auth, headers, body: requestBody, json });
-
-  const response = await fetch(apiUrl(route), {
-    ...fetchOptions,
-    headers: requestHeaders,
-    body: requestBody,
+  const requestConfig = buildRequestConfig({
+    ...requestOptions,
+    auth,
+    responseType,
+    url: route,
   });
 
-  if (response.status === 401 && retryOnUnauthorized) {
-    try {
-      await refreshStoredTokens();
-      return apiFetch(route, {
-        ...options,
-        retryOnUnauthorized: false,
-      });
-    } catch (error) {
-      expireSession();
-      throw error;
+  try {
+    const response = await apiClient.request(requestConfig);
+    return parseResponse(response, responseType);
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 401 && retryOnUnauthorized) {
+      try {
+        await refreshStoredTokens();
+        return apiFetch(route, {
+          ...options,
+          retryOnUnauthorized: false,
+        });
+      } catch (refreshError) {
+        expireSession();
+        throw refreshError;
+      }
     }
-  }
 
-  if (!response.ok) {
-    throw new Error(await parseApiError(response, errorMessage));
+    throw new Error(getApiErrorMessage(error, errorMessage));
   }
-
-  return parseResponse(response, responseType);
 }

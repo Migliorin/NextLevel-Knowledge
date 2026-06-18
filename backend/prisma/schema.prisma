@@ -5,26 +5,38 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
-model User {
-  id            Int      @id @default(autoincrement())
-  email         String   @unique
-  password      String
-  name          String
-  refreshToken  String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @default(now()) @updatedAt
 
-  files     Files[]
+model User {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  password     String
+  name         String
+  refreshToken String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  files Files[]
 }
 
 model Files {
   id        Int      @id @default(autoincrement())
   name      String
   path      String
-  status    Int      @default(0)
+  description String?
+  statusId  Int
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId Int
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status Status @relation(fields: [statusId], references: [id])
+}
+
+model Status {
+  id        Int      @id
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  files Files[]
 }
